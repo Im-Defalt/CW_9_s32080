@@ -10,7 +10,7 @@ namespace CW_9.Services;
 public interface IDbService
 {
     public Task<PrescriptionGetDTO> CreatePrescriptionAsync(PrescriptionCreateDTO prescriptionData);
-    public Task<PatientGetDTO> GetPatientDetailsAsync(int id);
+    public Task<PatientGetDtoSecondEnpoint> GetPatientDetailsAsync(int id);
 }
 
 public class DbService(AppDbContext data) : IDbService
@@ -85,16 +85,38 @@ public class DbService(AppDbContext data) : IDbService
 
     }
 
-    public async Task<PatientGetDTO> GetPatientDetailsAsync(int id)
+    public async Task<PatientGetDtoSecondEnpoint> GetPatientDetailsAsync(int id)
     {
-        Patient? patient = await data.Patients.FirstOrDefaultAsync(e => e.IdPatient == id);
+        Patient? patientRead = await data.Patients.FirstOrDefaultAsync(e => e.IdPatient == id);
 
-        if (patient == null)
+        if (patientRead == null)
         {
             throw new NotFoundException($"Patient {id} not found.");
         }
         
+        var result = await data.Patients.Select(pt => new PatientGetDtoSecondEnpoint()
+        {
+            IdPatient = pt.IdPatient,
+            FirstName = pt.FirstName,
+            LastName = pt.LastName,
+            Birthdate = pt.Birthdate,
+            Prescriptions = pt.Prescriptions.Select(presc => new PrescriptionGetDtoSecondEndpoint()
+            {
+                IdPrescription = presc.IdPrescription,
+                Date = presc.Date,
+                DueDate = presc.DueDate,
+                Medicaments = presc.PrescriptionMedicaments.Select(premed => new PrescriptionMedicamentGetDtoSecondEndpoint
+                {
+                    IdMedicament = premed.IdMedicament,
+                    Dose = (premed.Dose == null) ? null : premed.Dose,
+                    Details = premed.Details
+                    
+                }).ToList(),
+                Doctor = presc.Doctor
+            }).ToList(),
+        }).FirstOrDefaultAsync();
         
+        return result ?? throw new NotFoundException($"Patient {id} not found.");
     }
     
 }
